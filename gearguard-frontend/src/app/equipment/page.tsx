@@ -1,261 +1,155 @@
-"use client"
+"use client";
 
-import { cn } from "@/lib/utils"
-
-import { useState } from "react"
-import { Search, Filter, MoreVertical, MapPin, Users, History, AlertTriangle } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-
-interface Equipment {
-  id: string
-  name: string
-  department: string
-  location: string
-  team: string
-  requestCount: number
-  status: "Operational" | "Maintenance" | "Critical"
-  lastService: string
-}
-
-const EQUIPMENT_DATA: Equipment[] = [
-  {
-    id: "EQ-001",
-    name: "Conveyor System C-04",
-    department: "Production",
-    location: "Main Floor - Bay 2",
-    team: "Mechanical Alpha",
-    requestCount: 3,
-    status: "Maintenance",
-    lastService: "2025-10-12",
-  },
-  {
-    id: "EQ-002",
-    name: "HVAC Main Unit",
-    department: "Facilities",
-    location: "Rooftop - Section A",
-    team: "HVAC Specialists",
-    requestCount: 0,
-    status: "Operational",
-    lastService: "2025-11-01",
-  },
-  {
-    id: "EQ-003",
-    name: "Forklift #42",
-    department: "Logistics",
-    location: "Warehouse - Dock 4",
-    team: "Vehicle Maintenance",
-    requestCount: 5,
-    status: "Critical",
-    lastService: "2025-08-15",
-  },
-  {
-    id: "EQ-004",
-    name: "CNC Router R-01",
-    department: "Fabrication",
-    location: "Shop Floor - Zone 1",
-    team: "Mechanical Alpha",
-    requestCount: 1,
-    status: "Operational",
-    lastService: "2025-11-10",
-  },
-  {
-    id: "EQ-005",
-    name: "Hydraulic Press P-02",
-    department: "Production",
-    location: "Main Floor - Bay 5",
-    team: "Heavy Equipment",
-    requestCount: 2,
-    status: "Maintenance",
-    lastService: "2025-09-20",
-  },
-]
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { API_BASE } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Plus, MapPin, User, Wrench } from "lucide-react";
+import Link from "next/link";
 
 export default function EquipmentPage() {
-  const [search, setSearch] = useState("")
-  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
-  const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const queryClient = useQueryClient();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const filteredEquipment = EQUIPMENT_DATA.filter(
-    (eq) =>
-      eq.name.toLowerCase().includes(search.toLowerCase()) ||
-      eq.department.toLowerCase().includes(search.toLowerCase()),
-  )
+  // 1. Fetch data dynamically
+  const { data: assets = [], isLoading, isError } = useQuery({
+    queryKey: ["equipment"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/equipment`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
-  const handleShowRequests = (equipment: Equipment) => {
-    setSelectedEquipment(equipment)
-    setIsDetailOpen(true)
-  }
+  // 2. Mutation to Save Asset to Database
+  const createAsset = useMutation({
+    mutationFn: async (newAsset: any) => {
+      const res = await fetch(`${API_BASE}/equipment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newAsset),
+      });
+      if (!res.ok) throw new Error("Failed to create asset");
+      return res.json();
+    },
+    onSuccess: () => {
+      // Refresh the list and close modal
+      queryClient.invalidateQueries({ queryKey: ["equipment"] });
+      setIsModalOpen(false);
+    },
+  });
+
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
+    createAsset.mutate(data);
+  };
+
+  if (isLoading) return <div className="p-10 font-medium text-center">Syncing Inventory...</div>;
+  if (isError) return <div className="p-10 text-red-500 text-center">Error connecting to database.</div>;
 
   return (
-    <div className="flex flex-col gap-8 p-8">
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
+      <header className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Equipment Inventory</h1>
-          <p className="text-muted-foreground mt-1 text-lg">Manage your assets, locations, and maintenance history.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Equipment Inventory</h1>
+          <p className="text-sm text-slate-500">Manage assets and maintenance history.</p>
         </div>
-        <Button className="shadow-sm">Add New Asset</Button>
-      </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search equipment or department..."
-            className="pl-9 bg-background border-none shadow-sm"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <Button variant="outline" className="gap-2 bg-background border-none shadow-sm">
-          <Filter className="h-4 w-4" /> Filter
-        </Button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredEquipment.map((eq) => (
-          <Card key={eq.id} className="border-none shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-              <div className="space-y-1">
-                <CardTitle className="text-lg">{eq.name}</CardTitle>
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{eq.id}</p>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                  <DropdownMenuItem>Edit Details</DropdownMenuItem>
-                  <DropdownMenuItem>Schedule Service</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive">Decommission</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge
-                    variant="secondary"
-                    className={cn(
-                      "text-[10px] uppercase font-bold px-2 py-0.5 border-0",
-                      eq.status === "Operational" && "bg-success/15 text-success",
-                      eq.status === "Maintenance" && "bg-primary/15 text-primary",
-                      eq.status === "Critical" && "bg-destructive/15 text-destructive",
-                    )}
-                  >
-                    {eq.status}
-                  </Badge>
-                  <Badge variant="outline" className="text-[10px] bg-muted/50 border-0">
-                    {eq.department}
-                  </Badge>
-                </div>
-
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5" />
-                    <span>{eq.location}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5" />
-                    <span>{eq.team}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <History className="h-3.5 w-3.5" />
-                    <span>Last Service: {eq.lastService}</span>
-                  </div>
-                </div>
-
-                <Button
-                  className="w-full mt-4 justify-between bg-primary/5 hover:bg-primary/10 text-primary border-0 shadow-none"
-                  onClick={() => handleShowRequests(eq)}
-                >
-                  <span className="font-semibold">Maintenance Requests</span>
-                  <Badge className="bg-primary text-primary-foreground h-5 min-w-[20px] px-1.5 rounded-full">
-                    {eq.requestCount}
-                  </Badge>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Maintenance Requests: {selectedEquipment?.name}</DialogTitle>
-            <DialogDescription>Viewing all active and historical requests for this asset.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {selectedEquipment && selectedEquipment.requestCount > 0 ? (
-              <div className="space-y-3">
-                <div className="rounded-lg border p-4 flex gap-4">
-                  <div className="h-10 w-10 rounded-full bg-destructive/10 text-destructive flex items-center justify-center shrink-0">
-                    <AlertTriangle className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold">Unusual Noise Detected</p>
-                      <Badge variant="secondary" className="text-[10px]">
-                        In Progress
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Reported by: Production Team</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Technician Alex Smith is currently investigating potential bearing failure in the primary drive
-                      shaft.
-                    </p>
-                  </div>
-                </div>
-                <div className="rounded-lg border p-4 flex gap-4">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <History className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold">Scheduled Calibration</p>
-                      <Badge variant="secondary" className="text-[10px]">
-                        Upcoming
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Plan ID: PREV-992</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Next routine maintenance scheduled for next Monday to ensure precision standards are met.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="py-12 flex flex-col items-center justify-center text-center opacity-60">
-                <History className="h-12 w-12 mb-4 text-muted-foreground" />
-                <p className="font-medium text-muted-foreground">No maintenance history available</p>
-                <p className="text-sm text-muted-foreground">This asset is currently in optimal condition.</p>
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
-              Close
+        {/* --- DYNAMIC ADD ASSET MODAL --- */}
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-600 hover:bg-blue-700 gap-2 shadow-sm">
+              <Plus size={18} /> Add New Asset
             </Button>
-            <Button>Create New Request</Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Register New Equipment</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleFormSubmit} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Equipment Name</label>
+                <Input name="name" placeholder="e.g. CNC Router R-01" required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Serial Number</label>
+                <Input name="serialNumber" placeholder="Unique ID" required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <Input name="category" placeholder="Fabrication" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Department</label>
+                  <Input name="department" placeholder="Production" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Location</label>
+                <Input name="location" placeholder="Floor 1, Bay 4" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Assigned Employee</label>
+                <Input name="assignedEmployee" placeholder="Technician Name" />
+              </div>
+              <Button type="submit" className="w-full bg-blue-600" disabled={createAsset.isPending}>
+                {createAsset.isPending ? "Saving..." : "Save Asset"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </header>
+
+      {/* --- EQUIPMENT LIST GRID --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {assets.length > 0 ? (
+          assets.map((item: any) => (
+            <Card key={item.id} className="hover:shadow-lg transition-all border-slate-200 bg-white">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div className="space-y-1">
+                  <CardTitle className="text-lg font-bold text-slate-800">{item.name}</CardTitle>
+                  <p className="text-[10px] font-mono text-slate-400 uppercase">{item.serialNumber}</p>
+                </div>
+                <Badge className={item.isUsable ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                  {item.isUsable ? "Operational" : "Scrapped"}
+                </Badge>
+              </CardHeader>
+              
+              <CardContent className="space-y-4 pt-4">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <Badge variant="outline" className="justify-center bg-blue-50/50 border-blue-100">{item.category}</Badge>
+                  <Badge variant="outline" className="justify-center bg-slate-50 border-slate-200">{item.department}</Badge>
+                </div>
+
+                <div className="space-y-2 text-sm text-slate-600">
+                  <div className="flex items-center gap-2"><MapPin size={14} className="text-slate-400" /> {item.location}</div>
+                  <div className="flex items-center gap-2"><User size={14} className="text-slate-400" /> {item.assignedEmployee}</div>
+                </div>
+
+                <Link href={`/equipment/${item.id}`} className="block">
+                  <Button variant="secondary" className="w-full justify-between hover:bg-slate-200">
+                    <span className="flex items-center gap-2"><Wrench size={14} /> Maintenance</span>
+                    <Badge className="bg-blue-600 text-white border-none h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
+                      {item.requestCount || 0}
+                    </Badge>
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <div className="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-white">
+            <p className="text-slate-400">No equipment found in database. Click "Add New Asset" to start.</p>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
     </div>
-  )
+  );
 }

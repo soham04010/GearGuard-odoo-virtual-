@@ -49,3 +49,31 @@ export const requests = pgTable("requests", {
 export const userRelations = relations(users, ({ many }) => ({
   requestsCreated: many(requests),
 }));
+
+// Add these at the bottom of your schema.ts
+export const equipmentRelations = relations(equipment, ({ one, many }) => ({
+  team: one(teams, {
+    fields: [equipment.maintenanceTeamId],
+    references: [teams.id],
+  }),
+  technician: one(users, {
+    fields: [equipment.assignedTechnicianId],
+    references: [users.id],
+  }),
+  requests: many(requests),
+}));
+
+export const requestsRelations = relations(requests, ({ one }) => ({
+  equipment: one(equipment, {
+    fields: [requests.equipmentId],
+    references: [equipment.id],
+  }),
+  creator: one(users, {
+    fields: [requests.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const teamRelations = relations(teams, ({ many }) => ({
+  equipment: many(equipment),
+}));
