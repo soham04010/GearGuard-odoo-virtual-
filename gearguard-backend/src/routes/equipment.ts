@@ -39,24 +39,34 @@ router.get("/", async (req, res) => {
 
 /**
  * 2. GET SINGLE EQUIPMENT BY ID
- * Provides detail for the "Smart Button" view
+ * Enhanced to include maintenance history for the audit trail
  */
 router.get("/:id", async (req, res) => {
   const assetId = Number(req.params.id);
   try {
     const asset = await db.query.equipment.findFirst({
       where: eq(equipment.id, assetId),
-      with: { team: true }
+      // NEW: Include requests relation to fetch history
+      with: { 
+        team: true,
+        requests: true 
+      }
     });
 
     if (!asset) return res.status(404).json({ error: "Equipment not found" });
 
-    const [countResult] = await db
+    // Filter countResult to only show active (not Repaired/Scrap) for the Smart Button
+    const activeCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(requests)
-      .where(sql`${requests.equipmentId} = ${assetId} AND ${requests.status} NOT IN ('Repaired', 'Scrap')`);
+      .where(
+        sql`${requests.equipmentId} = ${assetId} AND ${requests.status} NOT IN ('Repaired', 'Scrap')`
+      );
 
-    res.json({ ...asset, requestCount: Number(countResult?.count || 0) });
+    res.json({ 
+      ...asset, 
+      requestCount: Number(activeCount[0]?.count || 0) 
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch details" });
   }
