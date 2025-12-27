@@ -1,11 +1,21 @@
-import Link from "next/link";
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link"; // FIX: Added missing import
 import { Button } from "@/components/ui/button";
 import { Settings, Shield, Activity } from "lucide-react";
 
 export default function HomePage() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Dynamic check for user session
+  useEffect(() => {
+    const user = localStorage.getItem("user");
+    setIsLoggedIn(!!user);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col">
-      {/* Subtle Top Border Decor */}
       <div className="h-1 w-full bg-blue-600" />
       
       <main className="flex-1 flex flex-col items-center justify-center px-6">
@@ -18,25 +28,28 @@ export default function HomePage() {
               Gear<span className="text-blue-600">Guard</span>
             </h1>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              Centralized monitoring for your asset maintenance operations. 
-              Connect teams, equipment, and requests in one unified interface.
+              The ultimate maintenance tracker for your company assets. 
+              Connect teams, equipment, and requests seamlessly.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/login">
+            {/* Dynamic Routing Logic */}
+            <Link href={isLoggedIn ? "/dashboard" : "/login"}>
               <Button size="lg" className="bg-blue-600 hover:bg-blue-700 px-10 h-12 text-md shadow-sm">
-                Access Dashboard
+                {isLoggedIn ? "Resume Dashboard" : "Access Dashboard"}
               </Button>
             </Link>
-            <Link href="/signup">
-              <Button variant="outline" size="lg" className="border-slate-200 text-slate-700 hover:bg-slate-50 px-10 h-12 text-md shadow-sm">
-                Register New Unit
-              </Button>
-            </Link>
+            
+            {!isLoggedIn && (
+              <Link href="/signup">
+                <Button variant="outline" size="lg" className="border-slate-200 text-slate-700 hover:bg-slate-50 px-10 h-12 text-md shadow-sm">
+                  Register New Unit
+                </Button>
+              </Link>
+            )}
           </div>
 
-          {/* Quick Stats/Features to match Dashboard Icons */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12 border-t border-slate-200">
             {[
               { label: "Predictive Analytics", icon: Activity },

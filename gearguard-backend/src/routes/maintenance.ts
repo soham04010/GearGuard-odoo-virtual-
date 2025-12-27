@@ -7,13 +7,14 @@ const router = Router();
 
 /**
  * 1. GET ALL REQUESTS (Dynamic for Kanban)
- * This uses Drizzle Relational Queries to include Equipment info
+ * Optimized to include Equipment AND Creator (Technician) info
  */
 router.get("/requests", async (req, res) => {
   try {
     const data = await db.query.requests.findMany({
       with: {
-        equipment: true, // This maps to the relation in schema.ts
+        equipment: true, 
+        creator: true, // IMPORTANT: This fetches the technician's name/email
       },
       orderBy: (requests, { desc }) => [desc(requests.createdAt)],
     });
@@ -26,10 +27,10 @@ router.get("/requests", async (req, res) => {
 
 /**
  * 2. CREATE REQUEST (Flow 1: Breakdown)
- * Auto-fills maintenance team from equipment data
+ * Now accepts createdBy to assign a technician dynamically
  */
 router.post("/requests", async (req, res) => {
-  const { equipmentId, subject, type, scheduledDate } = req.body;
+  const { equipmentId, subject, type, scheduledDate, createdBy } = req.body;
   
   try {
     const asset = await db.query.equipment.findFirst({
@@ -39,20 +40,20 @@ router.post("/requests", async (req, res) => {
     const [newRequest] = await db.insert(requests).values({
       subject,
       equipmentId,
+      createdBy, // Dynamic Technician Assignment
       type: type || "Corrective",
       scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-      status: "New", // Default status for Kanban
+      status: "New",
     }).returning();
 
-    res.status(201).json({ ...newRequest, teamId: asset?.maintenanceTeamId });
+    res.status(201).json(newRequest);
   } catch (err) {
     res.status(500).json({ error: "Creation failed" });
   }
 });
 
 /**
- * 3. UPDATE REQUEST (Kanban & Scrap Logic)
- * Dynamically handles stage progression and equipment status
+ * 3. UPDATE REQUEST (Kanban, Scrap & Service Logic)
  */
 router.patch("/requests/:id", async (req, res) => {
   const { id } = req.params;
@@ -64,7 +65,12 @@ router.patch("/requests/:id", async (req, res) => {
       .where(eq(requests.id, parseInt(id)))
       .returning();
 
-    // SCRAP LOGIC: If status is Scrap, mark equipment unusable
+    if (status === "Repaired" && equipmentId) {
+      await db.update(equipment)
+        .set({ lastServiceDate: new Date() })
+        .where(eq(equipment.id, equipmentId));
+    }
+
     if (status === "Scrap" && equipmentId) {
       await db.update(equipment)
         .set({ isUsable: false })
@@ -90,6 +96,5 @@ router.get("/dropdown/equipment", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch dropdown data" });
   }
 });
-
 
 export default router;

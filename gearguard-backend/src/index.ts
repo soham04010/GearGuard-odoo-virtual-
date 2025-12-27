@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.js";
 import requestRoutes from "./routes/requests.js";
 import equipmentRoutes from "./routes/equipment.js";
 import maintenanceRoutes from "./routes/maintenance.js";
+import reportRoutes from "./routes/reports.js"; // New Report Route
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/equipment", equipmentRoutes);
 app.use("/api/maintenance", maintenanceRoutes);
+app.use("/api/reports", reportRoutes); // High-Risk & Metrics logic
 
 const PORT = process.env.PORT || 3001;
 
