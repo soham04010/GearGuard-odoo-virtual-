@@ -5,10 +5,25 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
-// Strict Email Regex
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-// SIGNUP ROUTE
+// 1. GET ALL USERS (Dynamic for Technician Assignment)
+router.get("/users", async (req, res) => {
+  try {
+    const allUsers = await db.query.users.findMany({
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+    res.json(allUsers || []);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// 2. SIGNUP ROUTE
 router.post("/signup", async (req, res) => {
   const { name, email, password, confirmPassword } = req.body;
 
@@ -17,7 +32,7 @@ router.post("/signup", async (req, res) => {
   }
 
   if (!EMAIL_REGEX.test(email)) {
-    return res.status(400).json({ error: "Please provide a valid email (e.g., @gmail.com)" });
+    return res.status(400).json({ error: "Please provide a valid email" });
   }
 
   if (password.length < 6) {
@@ -39,7 +54,7 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// LOGIN ROUTE
+// 3. LOGIN ROUTE
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 

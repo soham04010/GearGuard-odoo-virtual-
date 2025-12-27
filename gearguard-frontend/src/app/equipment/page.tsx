@@ -8,24 +8,22 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, MapPin, User, Wrench } from "lucide-react";
+import { Plus, MapPin, User, Wrench, Search, Box, Building2, Warehouse } from "lucide-react";
 import Link from "next/link";
 
 export default function EquipmentPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // 1. Fetch data dynamically
-  const { data: assets = [], isLoading, isError } = useQuery({
+  const { data: assets = [], isLoading } = useQuery({
     queryKey: ["equipment"],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/equipment`);
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
+      return res.json();
     },
   });
 
-  // 2. Mutation to Save Asset to Database
   const createAsset = useMutation({
     mutationFn: async (newAsset: any) => {
       const res = await fetch(`${API_BASE}/equipment`, {
@@ -33,11 +31,9 @@ export default function EquipmentPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newAsset),
       });
-      if (!res.ok) throw new Error("Failed to create asset");
       return res.json();
     },
     onSuccess: () => {
-      // Refresh the list and close modal
       queryClient.invalidateQueries({ queryKey: ["equipment"] });
       setIsModalOpen(false);
     },
@@ -46,109 +42,134 @@ export default function EquipmentPage() {
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-    createAsset.mutate(data);
+    createAsset.mutate(Object.fromEntries(formData.entries()));
   };
 
-  if (isLoading) return <div className="p-10 font-medium text-center">Syncing Inventory...</div>;
-  if (isError) return <div className="p-10 text-red-500 text-center">Error connecting to database.</div>;
+  const filteredAssets = assets.filter((item: any) => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.serialNumber.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (isLoading) return <div className="p-10 text-center font-medium">Syncing Inventory...</div>;
 
   return (
     <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
-      <header className="flex justify-between items-center">
+      <header className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Equipment Inventory</h1>
-          <p className="text-sm text-slate-500">Manage assets and maintenance history.</p>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight text-left">Equipment Inventory</h1>
+          <p className="text-sm text-slate-500">Manage assets and maintenance history dynamically.</p>
         </div>
 
-        {/* --- DYNAMIC ADD ASSET MODAL --- */}
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700 gap-2 shadow-sm">
-              <Plus size={18} /> Add New Asset
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Register New Equipment</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleFormSubmit} className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Equipment Name</label>
-                <Input name="name" placeholder="e.g. CNC Router R-01" required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Serial Number</label>
-                <Input name="serialNumber" placeholder="Unique ID" required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
-                  <Input name="category" placeholder="Fabrication" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Department</label>
-                  <Input name="department" placeholder="Production" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Location</label>
-                <Input name="location" placeholder="Floor 1, Bay 4" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Assigned Employee</label>
-                <Input name="assignedEmployee" placeholder="Technician Name" />
-              </div>
-              <Button type="submit" className="w-full bg-blue-600" disabled={createAsset.isPending}>
-                {createAsset.isPending ? "Saving..." : "Save Asset"}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              placeholder="Search Name or Serial..." 
+              className="pl-9 bg-white"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 gap-2">
+                <Plus size={18} /> Add New Asset
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[550px]">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">Register New Asset</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleFormSubmit} className="grid grid-cols-2 gap-4 pt-4">
+                <div className="col-span-2 space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Asset Name</label>
+                  <Input name="name" placeholder="e.g. Samsung Monitor 15\" required />
+                </div>
+                <div className="col-span-2 space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Serial Number</label>
+                  <Input name="serialNumber" placeholder="Unique ID (e.g. SN-9921)" required />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Category</label>
+                  <Input name="category" placeholder="Monitors" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Department</label>
+                  <Input name="department" placeholder="Admin" />
+                </div>
+                {/* Added Location and Work Center to match your mockup requirements */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Location / Address</label>
+                  <Input name="location" placeholder="Floor 1, Workshop" />
+                </div>
+                <div className="space-y-1.5 text-left">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Work Center</label>
+                  <Input name="workCenter" placeholder="Assembly Line A" />
+                </div>
+                <div className="col-span-2 space-y-1.5 text-left">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Assigned Employee</label>
+                  <Input name="assignedEmployee" placeholder="Technician Name" />
+                </div>
+                <Button type="submit" className="col-span-2 mt-2 bg-blue-600 font-bold uppercase tracking-widest py-6" disabled={createAsset.isPending}>
+                  {createAsset.isPending ? "Saving..." : "Save Asset"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
 
-      {/* --- EQUIPMENT LIST GRID --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {assets.length > 0 ? (
-          assets.map((item: any) => (
-            <Card key={item.id} className="hover:shadow-lg transition-all border-slate-200 bg-white">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg font-bold text-slate-800">{item.name}</CardTitle>
-                  <p className="text-[10px] font-mono text-slate-400 uppercase">{item.serialNumber}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {filteredAssets.map((item: any) => (
+          <Card key={item.id} className="hover:shadow-xl transition-all border-slate-200 bg-white overflow-hidden text-left">
+            <CardHeader className="flex flex-row items-start justify-between pb-3">
+              <div className="space-y-1">
+                <CardTitle className="text-xl font-bold text-blue-700">{item.name}</CardTitle>
+                <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{item.serialNumber}</p>
+              </div>
+              <Badge className={item.isUsable ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700 uppercase"}>
+                {item.isUsable ? "Operational" : "Scrapped"}
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1"><Box size={10} /> Category</p>
+                  <p className="text-xs font-semibold text-slate-700 truncate">{item.category || 'General'}</p>
                 </div>
-                <Badge className={item.isUsable ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
-                  {item.isUsable ? "Operational" : "Scrapped"}
-                </Badge>
-              </CardHeader>
-              
-              <CardContent className="space-y-4 pt-4">
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <Badge variant="outline" className="justify-center bg-blue-50/50 border-blue-100">{item.category}</Badge>
-                  <Badge variant="outline" className="justify-center bg-slate-50 border-slate-200">{item.department}</Badge>
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1"><Building2 size={10} /> Dept.</p>
+                  <p className="text-xs font-semibold text-slate-700 truncate">{item.department || 'Unassigned'}</p>
                 </div>
-
-                <div className="space-y-2 text-sm text-slate-600">
-                  <div className="flex items-center gap-2"><MapPin size={14} className="text-slate-400" /> {item.location}</div>
-                  <div className="flex items-center gap-2"><User size={14} className="text-slate-400" /> {item.assignedEmployee}</div>
+              </div>
+              <div className="space-y-2 text-sm text-slate-600">
+                <div className="flex items-center gap-2 font-medium">
+                  <MapPin size={14} className="text-blue-500" /> 
+                  <span className="truncate">{item.location || 'Not Specified'}</span>
                 </div>
-
-                <Link href={`/equipment/${item.id}`} className="block">
-                  <Button variant="secondary" className="w-full justify-between hover:bg-slate-200">
-                    <span className="flex items-center gap-2"><Wrench size={14} /> Maintenance</span>
-                    <Badge className="bg-blue-600 text-white border-none h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
-                      {item.requestCount || 0}
-                    </Badge>
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <div className="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-white">
-            <p className="text-slate-400">No equipment found in database. Click "Add New Asset" to start.</p>
-          </div>
-        )}
+                <div className="flex items-center gap-2 font-medium">
+                  <Warehouse size={14} className="text-orange-500" /> 
+                  <span className="truncate">{item.workCenter || 'No Work Center'}</span>
+                </div>
+                <div className="flex items-center gap-2 font-medium">
+                  <User size={14} className="text-slate-400" /> 
+                  <span className="truncate">{item.assignedEmployee || 'Unassigned'}</span>
+                </div>
+              </div>
+              <Link href={`/equipment/${item.id}`} className="block pt-2">
+                <Button variant="outline" className="w-full justify-between hover:bg-blue-50 group border-slate-200">
+                  <span className="flex items-center gap-2 font-bold text-slate-700 uppercase text-xs tracking-tighter">
+                    <Wrench size={14} className="text-blue-600" /> Maintenance
+                  </span>
+                  <Badge className="bg-blue-600 text-white h-6 min-w-[24px] flex items-center justify-center rounded-full font-bold">
+                    {item.requestCount || 0}
+                  </Badge>
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );

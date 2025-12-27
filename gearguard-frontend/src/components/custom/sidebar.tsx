@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { 
   LayoutDashboard, Trello, Calendar, HardDrive, 
-  LogOut, User, Settings, LogIn, UserPlus 
+  LogOut, User, Settings, LogIn, UserPlus, BarChart3 // Added BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 export default function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [user, setUser] = useState<{ id: string; name: string; email: string } | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -36,16 +36,17 @@ export default function Sidebar() {
     { name: "Kanban Board", icon: <Trello size={18} />, href: "/kanban" },
     { name: "Calendar", icon: <Calendar size={18} />, href: "/calendar" },
     { name: "Equipment", icon: <HardDrive size={18} />, href: "/equipment" },
+    { name: "Reporting", icon: <BarChart3 size={18} />, href: "/reporting" }, // Added Reporting link
   ];
 
   return (
-    <aside className="w-64 bg-white border-r flex flex-col justify-between h-full shadow-sm">
+    <aside className="w-64 bg-white border-r flex flex-col justify-between h-full shadow-sm shrink-0">
       <div className="p-4">
         <div className="flex items-center gap-2 px-2 py-6">
           <div className="bg-blue-600 p-1.5 rounded-lg text-white">
             <Settings size={20} />
           </div>
-          <span className="font-bold text-xl tracking-tight">GearGuard</span>
+          <span className="font-bold text-xl tracking-tight text-slate-900">GearGuard</span>
         </div>
 
         <nav className="space-y-1">
@@ -64,17 +65,16 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* Bottom Section - Conditional Rendering based on User Auth */}
       <div className="p-4 border-t bg-slate-50/50 space-y-2">
         {user ? (
           <>
             <div className="flex items-center gap-3 mb-4 px-2">
               <Avatar className="h-9 w-9 border border-white shadow-sm">
-                <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-bold">
-                  {user.name?.substring(0, 2).toUpperCase()}
+                <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-bold uppercase">
+                  {user.name?.substring(0, 2)}
                 </AvatarFallback>
               </Avatar>
-              <div className="overflow-hidden">
+              <div className="overflow-hidden text-slate-900">
                 <p className="text-sm font-semibold truncate mb-0.5">{user.name}</p>
                 <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
               </div>
@@ -91,15 +91,9 @@ export default function Sidebar() {
         ) : (
           <div className="space-y-2">
             <Link href="/login" className="w-full block">
-              <Button variant="outline" className="w-full justify-start gap-3 border-slate-200 hover:bg-white">
+              <Button variant="outline" className="w-full justify-start gap-3">
                 <LogIn size={18} className="text-slate-500" />
                 <span className="text-sm font-medium text-slate-700">Login</span>
-              </Button>
-            </Link>
-            <Link href="/signup" className="w-full block">
-              <Button className="w-full justify-start gap-3 bg-blue-600 hover:bg-blue-700">
-                <UserPlus size={18} />
-                <span className="text-sm font-medium">Create Account</span>
               </Button>
             </Link>
           </div>
