@@ -1,37 +1,27 @@
 import { Router } from "express";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { db } from "../db/index.js";
 import { requests, equipment } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { Pool } from "pg";
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const db = drizzle(pool);
 
 const router = Router();
 
-// Create a new request with Auto-fill data from Equipment
+// Create Request with Auto-fill Logic
 router.post("/", async (req, res) => {
   const { equipmentId, subject, type } = req.body;
+  
+  // Auto-fetch Team based on Equipment
+  const asset = await db.query.equipment.findFirst({
+    where: eq(equipment.id, equipmentId),
+    with: { team: true }
+  });
 
-  // Flow Logic: Fetch equipment details first
-  const [asset] = await db.select()
-    .from(equipment)
-    .where(eq(equipment.id, equipmentId));
-
-  if (!asset) return res.status(404).json({ error: "Equipment not found" });
-
-  // Create the request
-  const newRequest = await db.insert(requests).values({
+  const [newRequest] = await db.insert(requests).values({
     subject,
-    type,
     equipmentId,
-    // Note: You can also store the default technician from asset here
+    type: type || "Corrective",
   }).returning();
 
-  res.json(newRequest);
+  res.json({ ...newRequest, team: asset?.team });
 });
 
 export default router;
