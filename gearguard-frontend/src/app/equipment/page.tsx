@@ -1,6 +1,5 @@
 "use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { API_BASE } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +14,14 @@ export default function EquipmentPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("user");
+    if (stored) {
+      setCurrentUser(JSON.parse(stored));
+    }
+  }, []);
 
   const { data: assets = [], isLoading } = useQuery({
     queryKey: ["equipment"],
@@ -71,52 +78,54 @@ export default function EquipmentPage() {
             />
           </div>
 
-          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700 gap-2">
-                <Plus size={18} /> Add New Asset
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px]">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold">Register New Asset</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleFormSubmit} className="grid grid-cols-2 gap-4 pt-4">
-                <div className="col-span-2 space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Asset Name</label>
-                  <Input name="name" placeholder="e.g. Samsung Monitor 15\" required />
-                </div>
-                <div className="col-span-2 space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Serial Number</label>
-                  <Input name="serialNumber" placeholder="Unique ID (e.g. SN-9921)" required />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Category</label>
-                  <Input name="category" placeholder="Monitors" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Department</label>
-                  <Input name="department" placeholder="Admin" />
-                </div>
-                {/* Added Location and Work Center to match your mockup requirements */}
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Location / Address</label>
-                  <Input name="location" placeholder="Floor 1, Workshop" />
-                </div>
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Work Center</label>
-                  <Input name="workCenter" placeholder="Assembly Line A" />
-                </div>
-                <div className="col-span-2 space-y-1.5 text-left">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Assigned Employee</label>
-                  <Input name="assignedEmployee" placeholder="Technician Name" />
-                </div>
-                <Button type="submit" className="col-span-2 mt-2 bg-blue-600 font-bold uppercase tracking-widest py-6" disabled={createAsset.isPending}>
-                  {createAsset.isPending ? "Saving..." : "Save Asset"}
+          {currentUser?.role === "admin" && (
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 hover:bg-blue-700 gap-2">
+                  <Plus size={18} /> Add New Asset
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[550px]">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold">Register New Asset</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleFormSubmit} className="grid grid-cols-2 gap-4 pt-4">
+                  <div className="col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Asset Name</label>
+                    <Input name="name" placeholder="e.g. Samsung Monitor 15\" required />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Serial Number</label>
+                    <Input name="serialNumber" placeholder="Unique ID (e.g. SN-9921)" required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Category</label>
+                    <Input name="category" placeholder="Monitors" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Department</label>
+                    <Input name="department" placeholder="Admin" />
+                  </div>
+                  {/* Added Location and Work Center to match your mockup requirements */}
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Location / Address</label>
+                    <Input name="location" placeholder="Floor 1, Workshop" />
+                  </div>
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Work Center</label>
+                    <Input name="workCenter" placeholder="Assembly Line A" />
+                  </div>
+                  <div className="col-span-2 space-y-1.5 text-left">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Assigned Employee</label>
+                    <Input name="assignedEmployee" placeholder="Technician Name" />
+                  </div>
+                  <Button type="submit" className="col-span-2 mt-2 bg-blue-600 font-bold uppercase tracking-widest py-6" disabled={createAsset.isPending}>
+                    {createAsset.isPending ? "Saving..." : "Save Asset"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </header>
 

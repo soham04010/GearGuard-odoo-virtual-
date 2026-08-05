@@ -1,7 +1,5 @@
 import { Router } from "express";
-import { db } from "../db/index.js";
-import { users } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { User } from "../db/schema.js"; // 1. Import the Mongoose User Model
 
 const router = Router();
 
@@ -10,13 +8,8 @@ const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 // 1. GET ALL USERS (Dynamic for Technician Assignment)
 router.get("/users", async (req, res) => {
   try {
-    const allUsers = await db.query.users.findMany({
-      columns: {
-        id: true,
-        name: true,
-        email: true,
-      },
-    });
+    // .select("name email role") returns id, name, email, and role fields
+    const allUsers = await User.find({}).select("name email role");
     res.json(allUsers || []);
   } catch (e) {
     res.status(500).json({ error: "Failed to fetch users" });
@@ -25,7 +18,7 @@ router.get("/users", async (req, res) => {
 
 // 2. SIGNUP ROUTE
 router.post("/signup", async (req, res) => {
-  const { name, email, password, confirmPassword } = req.body;
+  const { name, email, password, confirmPassword, role } = req.body;
 
   if (!name?.trim() || !email?.trim() || !password || !confirmPassword) {
     return res.status(400).json({ error: "All fields are strictly required" });
@@ -33,6 +26,10 @@ router.post("/signup", async (req, res) => {
 
   if (!EMAIL_REGEX.test(email)) {
     return res.status(400).json({ error: "Please provide a valid email" });
+  }
+
+  if (role && role !== "user") {
+    return res.status(400).json({ error: "Only standard user accounts can be created via signup. Other roles must be created by an administrator." });
   }
 
   if (password.length < 6) {
@@ -44,11 +41,14 @@ router.post("/signup", async (req, res) => {
   }
 
   try {
-    const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) });
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ error: "Email already in use" });
 
-    const [newUser] = await db.insert(users).values({ name, email, password }).returning();
-    res.status(201).json({ id: newUser.id, name: newUser.name });
+    // Create the new user document in MongoDB
+    const newUser = await User.create({ name, email, password, role: "user" });
+    
+    res.status(201).json({ id: newUser._id, name: newUser.name, email: newUser.email, role: newUser.role });
   } catch (e) {
     res.status(500).json({ error: "Server error during registration" });
   }
@@ -59,15 +59,15 @@ router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await db.query.users.findFirst({
-      where: eq(users.email, email),
-    });
+    // Find user by email
+    const user = await User.findOne({ email });
 
     if (!user || user.password !== password) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    res.json({ id: user.id, name: user.name, email: user.email });
+    // MongoDB automatically yields '_id' for documents
+    res.json({ id: user._id, name: user.name, email: user.email, role: user.role });
   } catch (e) {
     res.status(500).json({ error: "Login failed" });
   }

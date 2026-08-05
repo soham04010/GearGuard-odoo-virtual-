@@ -1,79 +1,167 @@
-import { pgTable, serial, text, timestamp, integer, boolean, pgEnum, uuid } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { Schema, model, Document, Types } from "mongoose";
 
-// Enums for Workflow stages
-export const statusEnum = pgEnum("status", ["New", "In Progress", "Repaired", "Scrap"]);
-export const typeEnum = pgEnum("type", ["Corrective", "Preventive"]);
+// ==========================================
+// 1. Users Schema
+// ==========================================
+const userSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true }, // Hash this in production!
+    role: { type: String, enum: ["admin", "manager", "user", "technician", "auditor"], default: "user" },
+  },
+  { 
+    timestamps: { createdAt: "created_at", updatedAt: false },
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
 
-// 1. Users Table (UUID based)
-export const users = pgTable("users", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").unique().notNull(),
-  password: text("password").notNull(), // Hash this in production!
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const User = model("User", userSchema);
 
-// 2. Teams & Work Centers
-export const teams = pgTable("teams", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-});
+// ==========================================
+// 2. Teams Schema
+// ==========================================
+const teamSchema = new Schema(
+  {
+    name: { type: String, required: true },
+  },
+  {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
 
-// 3. Equipment & Categories
-export const equipment = pgTable("equipment", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  serialNumber: text("serial_number").unique().notNull(),
-  category: text("category"), // e.g., Computers, Monitors
-  location: text("location"),
-  isUsable: boolean("is_usable").default(true),
-  maintenanceTeamId: integer("maintenance_team_id").references(() => teams.id),
-  assignedTechnicianId: uuid("assigned_technician_id").references(() => users.id),
-});
+export const Team = model("Team", teamSchema);
 
-// 4. Maintenance Requests (Workflow)
-export const requests = pgTable("requests", {
-  id: serial("id").primaryKey(),
-  subject: text("subject").notNull(),
-  type: typeEnum("type").default("Corrective"),
-  status: statusEnum("status").default("New"),
-  equipmentId: integer("equipment_id").references(() => equipment.id),
-  createdBy: uuid("created_by").references(() => users.id),
-  scheduledDate: timestamp("scheduled_date"),
-  duration: integer("duration").default(0),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+// ==========================================
+// 3. Equipment Schema
+// ==========================================
+const equipmentSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    serialNumber: { type: String, required: true, unique: true },
+    category: { type: String }, // e.g., Computers, Monitors
+    location: { type: String },
+    department: { type: String, default: "General Operations" },
+    assignedEmployee: { type: String, default: "Unassigned" },
+    lastServiceDate: { type: Date },
+    isUsable: { type: Boolean, default: true },
+    maintenanceTeamId: { type: Schema.Types.ObjectId, ref: "Team" },
+    assignedTechnicianId: { type: Schema.Types.ObjectId, ref: "User" },
+  },
+  {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
 
-// Relations
-export const userRelations = relations(users, ({ many }) => ({
-  requestsCreated: many(requests),
-}));
+export const Equipment = model("Equipment", equipmentSchema);
 
-// Add these at the bottom of your schema.ts
-export const equipmentRelations = relations(equipment, ({ one, many }) => ({
-  team: one(teams, {
-    fields: [equipment.maintenanceTeamId],
-    references: [teams.id],
-  }),
-  technician: one(users, {
-    fields: [equipment.assignedTechnicianId],
-    references: [users.id],
-  }),
-  requests: many(requests),
-}));
+// ==========================================
+// 4. Maintenance Requests Schema
+// ==========================================
+const requestSchema = new Schema(
+  {
+    subject: { type: String, required: true },
+    type: { 
+      type: String, 
+      enum: ["Corrective", "Preventive"], 
+      default: "Corrective" 
+    },
+    status: { 
+      type: String, 
+      enum: ["New", "In Progress", "Repaired", "Scrap"], 
+      default: "New" 
+    },
+    equipmentId: { type: Schema.Types.ObjectId, ref: "Equipment" },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+    scheduledDate: { type: Date },
+    duration: { type: Number, default: 0 },
+  },
+  { 
+    timestamps: { createdAt: "created_at", updatedAt: false },
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
 
-export const requestsRelations = relations(requests, ({ one }) => ({
-  equipment: one(equipment, {
-    fields: [requests.equipmentId],
-    references: [equipment.id],
-  }),
-  creator: one(users, {
-    fields: [requests.createdBy],
-    references: [users.id],
-  }),
-}));
+export const Request = model("Request", requestSchema);
 
-export const teamRelations = relations(teams, ({ many }) => ({
-  equipment: many(equipment),
-}));
+// ==========================================
+// 5. Category Schema
+// ==========================================
+const categorySchema = new Schema(
+  {
+    name: { type: String, required: true, unique: true },
+    description: { type: String },
+  },
+  {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
+
+export const Category = model("Category", categorySchema);
+
+// ==========================================
+// 6. Location Schema
+// ==========================================
+const locationSchema = new Schema(
+  {
+    name: { type: String, required: true, unique: true },
+    address: { type: String },
+  },
+  {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
+
+export const Location = model("Location", locationSchema);
+
+// ==========================================
+// 7. Asset Request Schema
+// ==========================================
+const assetRequestSchema = new Schema(
+  {
+    employeeId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    assetName: { type: String, required: true },
+    category: { type: String },
+    reason: { type: String },
+    status: { 
+      type: String, 
+      enum: ["Pending", "Approved", "Rejected", "Allocated", "Returned"], 
+      default: "Pending" 
+    },
+    allocatedAssetId: { type: Schema.Types.ObjectId, ref: "Equipment" },
+    requestDate: { type: Date, default: Date.now },
+    approvalDate: { type: Date },
+    allocatedDate: { type: Date },
+    returnDate: { type: Date },
+  },
+  {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
+
+export const AssetRequest = model("AssetRequest", assetRequestSchema);
+
+// ==========================================
+// 8. Audit Log Schema
+// ==========================================
+const auditLogSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    action: { type: String, required: true },
+    details: { type: String },
+    timestamp: { type: Date, default: Date.now },
+  },
+  {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
+
+export const AuditLog = model("AuditLog", auditLogSchema);

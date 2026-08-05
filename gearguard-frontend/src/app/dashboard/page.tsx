@@ -48,11 +48,21 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 p-6 max-w-7xl mx-auto">
-      <header>
+      <header className="text-left">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 italic uppercase">
           Welcome Back, {currentUser?.name || "User"}
         </h1>
-        <p className="text-slate-500">Live system status from PostgreSQL.</p>
+        <div className="flex items-center gap-2 mt-1">
+          <Badge className="bg-blue-100 text-blue-800 uppercase font-extrabold text-[10px]">{currentUser?.role || "user"}</Badge>
+          <p className="text-slate-500 text-sm">
+            {currentUser?.role === "admin" && "Manage operators, asset registers, categories, and site locations."}
+            {currentUser?.role === "manager" && "Review employee requests, allocate components, and audit log activities."}
+            {currentUser?.role === "user" && "Submit request tickets for facility assets and process returns."}
+            {currentUser?.role === "technician" && "Oversee preventive calendars and kanban repair work stages."}
+            {currentUser?.role === "auditor" && "Generate asset failure rate metrics and view log ledgers."}
+            {!currentUser?.role && "Live system status from MongoDB Atlas."}
+          </p>
+        </div>
       </header>
 
       {/* Dynamic Section: My Assignments */}

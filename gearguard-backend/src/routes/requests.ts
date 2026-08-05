@@ -1,7 +1,5 @@
 import { Router } from "express";
-import { db } from "../db/index.js";
-import { requests, equipment } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { Request, Equipment } from "../db/schema.js"; // Import Mongoose models
 
 const router = Router();
 
@@ -9,19 +7,26 @@ const router = Router();
 router.post("/", async (req, res) => {
   const { equipmentId, subject, type } = req.body;
   
-  // Auto-fetch Team based on Equipment
-  const asset = await db.query.equipment.findFirst({
-    where: eq(equipment.id, equipmentId),
-    with: { team: true }
-  });
+  try {
+    // Auto-fetch Team based on Equipment by populating its reference configuration
+    const asset = await Equipment.findById(equipmentId).populate("maintenanceTeamId");
+    if (!asset) return res.status(404).json({ error: "Equipment asset not found" });
 
-  const [newRequest] = await db.insert(requests).values({
-    subject,
-    equipmentId,
-    type: type || "Corrective",
-  }).returning();
+    // Insert new request document into MongoDB
+    const newRequest = await Request.create({
+      subject,
+      equipmentId,
+      type: type || "Corrective",
+    });
 
-  res.json({ ...newRequest, team: asset?.team });
+    // Return the response combining the new request details with the asset's team info
+    res.json({ 
+      ...newRequest.toObject(), 
+      team: asset.maintenanceTeamId // Matches populated team profile context
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create request and auto-fill information" });
+  }
 });
 
 export default router;

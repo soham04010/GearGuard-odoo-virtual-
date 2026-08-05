@@ -22,15 +22,30 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
+import { useEffect } from "react";
+
 export default function CalendarPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const queryClient = useQueryClient();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("user");
+    if (stored) {
+      setCurrentUser(JSON.parse(stored));
+    }
+  }, []);
 
   // --- LOGIC: Fetch and Filter ---
   const { data: requests = [] } = useQuery({
     queryKey: ["requests"],
-    queryFn: () => fetch(`${API_BASE}/requests`).then((res) => res.json()),
+    queryFn: () => fetch(`${API_BASE}/maintenance/requests`).then((res) => res.json()),
+  });
+
+  const { data: assets = [] } = useQuery({
+    queryKey: ["equipment"],
+    queryFn: () => fetch(`${API_BASE}/equipment`).then((res) => res.json()),
   });
 
   const preventiveTasks = Array.isArray(requests) 
@@ -79,7 +94,7 @@ export default function CalendarPage() {
                           isSelected ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md" : ""
                         }`}
                         onClick={() => setDate(props.day.date)}
-                        onDoubleClick={() => setIsModalOpen(true)}
+                        onDoubleClick={() => currentUser?.role === "admin" && setIsModalOpen(true)}
                       >
                         <span className="text-base font-medium">{props.day.date.getDate()}</span>
                         {hasEvent && (
@@ -117,13 +132,13 @@ export default function CalendarPage() {
               <div className="space-y-4">
                 {selectedDayTasks.length > 0 ? (
                   selectedDayTasks.map((task: any) => (
-                    <div key={task.id} className="flex flex-col gap-2 rounded-xl border p-4 bg-white shadow-sm hover:border-primary/30 transition-colors">
+                    <div key={task.id} className="flex flex-col gap-2 rounded-xl border p-4 bg-white shadow-sm hover:border-primary/30 transition-colors text-left">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-base text-slate-900">{task.subject}</span>
                         <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none px-3 py-1">Planned</Badge>
                       </div>
                       <div className="flex items-center text-sm text-slate-500 gap-2">
-                        <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-mono">ID: {task.equipmentId}</span>
+                        <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-mono">Asset: {task.equipment?.name || "Unit"}</span>
                         <span className="italic">Equipment Check</span>
                       </div>
                     </div>
@@ -140,9 +155,11 @@ export default function CalendarPage() {
             </CardContent>
           </Card>
 
-          <Button className="w-full gap-3 py-8 text-lg font-semibold shadow-lg hover:shadow-xl transition-all" onClick={() => setIsModalOpen(true)}>
-            <Plus className="h-6 w-6" /> Schedule New Task
-          </Button>
+          {currentUser?.role === "admin" && (
+            <Button className="w-full gap-3 py-8 text-lg font-semibold shadow-lg hover:shadow-xl transition-all" onClick={() => setIsModalOpen(true)}>
+              <Plus className="h-6 w-6" /> Schedule New Task
+            </Button>
+          )}
         </div>
       </div>
 
@@ -150,14 +167,14 @@ export default function CalendarPage() {
         open={isModalOpen} 
         onOpenChange={setIsModalOpen} 
         selectedDate={date} 
+        assets={assets}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ["requests"] })}
       />
     </div>
   );
 }
 
-// ... ScheduleModal remains the same as in the previous fixed response ...
-function ScheduleModal({ open, onOpenChange, selectedDate, onSuccess }: any) {
+function ScheduleModal({ open, onOpenChange, selectedDate, assets, onSuccess }: any) {
   const [title, setTitle] = useState("");
   const [equipment, setEquipment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -167,7 +184,7 @@ function ScheduleModal({ open, onOpenChange, selectedDate, onSuccess }: any) {
     if (!selectedDate) return;
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE}/requests`, {
+      const response = await fetch(`${API_BASE}/maintenance/requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -175,7 +192,7 @@ function ScheduleModal({ open, onOpenChange, selectedDate, onSuccess }: any) {
           subject: title,
           equipmentId: equipment,
           scheduledDate: selectedDate.toISOString(),
-          status: "Planned",
+          status: "New",
         }),
       });
       if (response.ok) {
@@ -196,17 +213,30 @@ function ScheduleModal({ open, onOpenChange, selectedDate, onSuccess }: any) {
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>New Maintenance Task</DialogTitle>
-            <DialogDescription>Scheduling for {selectedDate ? format(selectedDate, "PPP") : ""}.</DialogDescription>
+            <DialogTitle className="text-left font-bold">New Maintenance Task</DialogTitle>
+            <DialogDescription className="text-left">Scheduling for {selectedDate ? format(selectedDate, "PPP") : ""}.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Task Subject</Label>
+            <div className="space-y-2 text-left">
+              <Label htmlFor="title" className="font-bold text-xs uppercase text-slate-500">Task Subject</Label>
               <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Monthly Inspection" required />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="equipment">Equipment / Asset ID</Label>
-              <Input id="equipment" value={equipment} onChange={(e) => setEquipment(e.target.value)} placeholder="e.g. PUMP-01" required />
+            <div className="space-y-2 text-left">
+              <Label htmlFor="equipment" className="font-bold text-xs uppercase text-slate-500">Equipment / Asset</Label>
+              <select
+                id="equipment"
+                value={equipment}
+                onChange={(e) => setEquipment(e.target.value)}
+                className="w-full p-2 border rounded-md text-sm bg-white"
+                required
+              >
+                <option value="">-- Choose Asset --</option>
+                {assets.map((a: any) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ({a.serialNumber})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <DialogFooter>
